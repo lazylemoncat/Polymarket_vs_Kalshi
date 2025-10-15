@@ -71,6 +71,7 @@ def load_market_pairs(excel_path: str, mapping: MarketPairMapping):
 
 def main():
     input_file = Path("Kalshi vs Polymarket 候选对.xlsx")
+    config_path = Path("config.json")
 
     mapping = MarketPairMapping()
     pairs = load_market_pairs(str(input_file), mapping)
@@ -80,15 +81,31 @@ def main():
         events = get_market_public_search(p.polymarket_title).get('events')[0]
         polymarket_token = events.get('id')
         settlement_date = events.get('endDate')
+        kalshi_ticker = p.kalshi_url.rstrip("/").split("/")[-1].upper()
         marketPairs.append(MarketPair(
             id=p.id,
             polymarket_token=polymarket_token,
-            kalshi_ticker="",
+            kalshi_ticker=kalshi_ticker,
             market_name=p.polymarket_title,
             settlement_date=settlement_date,
             manually_verified=True,
             notes=p.notes
         ))
+    
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    else:
+        config = {}
+
+    # 转换 dataclass → dict
+    config["market_pairs"] = [asdict(mp) for mp in marketPairs]
+
+    # 写回 JSON 文件（格式化输出）
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+    print(f"已更新 {config_path} 中的 market_pairs ({len(marketPairs)} 条)")
     
 
 
