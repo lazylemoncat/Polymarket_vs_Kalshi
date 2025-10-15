@@ -1,0 +1,71 @@
+{
+  "market_pairs": [
+    {
+      "id": "pair_001",
+      "polymarket_token": "58873",
+      "kalshi_ticker": "KXHIGHNY-25OCT15",
+      "market_name": "Highest temperature in NYC on October 15?",
+      "settlement_date": "2025-10-15T12:00:00Z",
+      "notes": "结算源不一致；截止时间不一致"
+    },
+    {
+      "id": "pair_002",
+      "polymarket_token": "57018",
+      "kalshi_ticker": "KXXRP-25OCT1600",
+      "market_name": "XRP price on October 16?",
+      "settlement_date": "2025-10-16T16:00:00Z",
+      "notes": "结算源不一致；截止时间不一致"
+    },
+    {
+      "id": "pair_003",
+      "polymarket_token": "56528",
+      "kalshi_ticker": "KXETHD-25OCT1517",
+      "market_name": "Ethereum price on October 15?",
+      "settlement_date": "2025-10-15T16:00:00Z",
+      "notes": "结算源不一致；截止时间不一致"
+    },
+    {
+      "id": "pair_004",
+      "polymarket_token": "57570",
+      "kalshi_ticker": "KXPOWELLMENTION-25OCT15",
+      "market_name": "What will Powell say during his speech on October 14?",
+      "settlement_date": "2025-10-14T00:00:00Z",
+      "notes": "深度尽调已完成"
+    },
+    {
+      "id": "pair_005",
+      "polymarket_token": "59200",
+      "kalshi_ticker": "KXBERNIEMENTION-25OCT16",
+      "market_name": "What will Bernie Sanders say during CNN town hall on October 15?",
+      "settlement_date": "2025-10-15T00:00:00Z",
+      "notes": "深度尽调已完成"
+    },
+    {
+      "id": "pair_006",
+      "polymarket_token": "56512",
+      "kalshi_ticker": "KXBTCD-25OCT1517",
+      "market_name": "Bitcoin price on October 15?",
+      "settlement_date": "2025-10-15T16:00:00Z",
+      "notes": "结算源不一致；截止时间不一致"
+    },
+    {
+      "id": "pair_007",
+      "polymarket_token": "57472",
+      "kalshi_ticker": "KXBTCD-25OCT1717",
+      "market_name": "Bitcoin price on October 17?",
+      "settlement_date": "2025-10-17T16:00:00Z",
+      "notes": "结算源不一致；截止时间不一致"
+    }
+  ],
+  "monitoring": {
+    "polling_interval_seconds": 2,
+    "monitoring_duration_hours": 48
+  },
+  "cost_assumptions": {
+    "gas_fee_per_trade_usd": 0.10
+  },
+  "alerting": {
+    "telegram_bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+    "telegram_chat_id": "YOUR_CHAT_ID"
+  }
+}
