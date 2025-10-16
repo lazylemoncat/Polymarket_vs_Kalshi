@@ -23,13 +23,34 @@ def get_market_public_search(querystring: str):
     return response.json()
 
 def main():
-    # market_list = get_market_list()
-    # print(market_list)
-    # print(market_list[0])
-    # market = get_market_by_id(market_list[0].get('id'))
-    # print(market)
-    market = get_market_public_search("Highest temperature in NYC on Oct 14, 2025?")
-    print(market)
+    market_list = get_market_list()
+    from py_clob_client.client import ClobClient
+    from py_clob_client.clob_types import BookParams
+    import json
+
+    client = ClobClient("https://clob.polymarket.com")  # read-only
+    for market in market_list:
+        try:
+            id = market.get("id")
+            market_by_id = get_market_by_id(id)
+            clobTokenIds = market_by_id.get("clobTokenIds", [])
+            # print(f"Market ID: {id} | clobTokenIds: {clobTokenIds}")
+            # clobTokenIds = market.get("clobTokenIds", [])
+            # ✅ 第一步：解析 JSON 字符串
+            token_ids = json.loads(clobTokenIds)
+            # print("Parsed token IDs:", token_ids)
+
+            # ✅ 第二步：传入真实的 token_id（字符串，不是 int）
+            token_id = token_ids[0]
+
+            book = client.get_order_book(token_id)
+            # print(f"✅ Token {token_id}")
+            print(f"Asks: {len(book.asks)} | Bids: {len(book.bids)}")
+        except Exception as e:
+            print(f"❌ Error processing market ID {id}: {e}")
+            # continue
+            break
+    
 
 if __name__ == "__main__":
     main()

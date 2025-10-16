@@ -1,121 +1,97 @@
 import time
-import datetime
 from utils.polymarket_client import PolymarketClient
 from utils.kalshi_client import KalshiClient
-from utils import fees, spreads, logger, state_manager, terminal_ui, config_loader
+from utils.config_loader import load_config
 
 
-def init_clients(cfg):
-    """初始化 API 客户端"""
-    polling_interval = cfg["monitoring"]["polling_interval_seconds"]
+def compare_markets(poly_markets, kalshi_markets):
+    """
+    比较 Polymarket 与 Kalshi 对应市场价格差异。
+    暂时按顺序匹配(第1对第1),后续可改用温度区间或市场标题匹配。
+    """
+    results = []
+    for i, poly_m in enumerate(poly_markets):
+        if i >= len(kalshi_markets):
+            break
 
-    poly = PolymarketClient(
-        base_url="https://gamma-api.polymarket.com",
-        polling_interval=polling_interval
-    )
+        kalshi_m = kalshi_markets[i]
 
-    kalshi = KalshiClient(
-        base_url="https://api.elections.kalshi.com/trade-api/v2",
-        polling_interval=polling_interval,
-        api_key=cfg.get("kalshi_api_key")  # 如果有私钥
-    )
+        poly_name = poly_m.get("question") or poly_m.get("id")
+        kalshi_name = kalshi_m.get("subtitle") or kalshi_m.get("ticker")
 
-    return {"poly": poly, "kalshi": kalshi}
+        poly_yes = poly_m.get("bestAsk") or poly_m.get("ask") or 0
+        poly_no = poly_m.get("bestBid") or poly_m.get("bid") or 0
+        kalshi_yes = kalshi_m.get("yes_ask") or kalshi_m.get("yes_price") or 0
+        kalshi_no = kalshi_m.get("no_ask") or kalshi_m.get("no_price") or 0
+
+        diff_yes = kalshi_yes - poly_yes
+        diff_no = kalshi_no - poly_no
+
+        results.append({
+            "poly_market": poly_name,
+            "kalshi_market": kalshi_name,
+            "poly_yes": poly_yes,
+            "kalshi_yes": kalshi_yes,
+            "diff_yes": diff_yes,
+            "poly_no": poly_no,
+            "kalshi_no": kalshi_no,
+            "diff_no": diff_no
+        })
+    return results
+
+
+def display_arbitrage_opportunities(results):
+    """打印套利机会（仅展示价差大的市场）"""
+    has_arb = False
+    for r in results:
+        if abs(r["diff_yes"]) > 0.05 or abs(r["diff_no"]) > 0.05:  # 可调整阈值
+            has_arb = True
+            print(f"市场: {r['poly_market']} ↔ {r['kalshi_market']}")
+            print(f"Polymarket Yes: {r['poly_yes']} | Kalshi Yes: {r['kalshi_yes']} | Δ = {r['diff_yes']:.3f}")
+            print(f"Polymarket No : {r['poly_no']}  | Kalshi No : {r['kalshi_no']}  | Δ = {r['diff_no']:.3f}")
+            print("-" * 60)
+    if not has_arb:
+        print("暂无套利机会。")
 
 
 def main():
-    cfg = config_loader.load_config()
-    clients = init_clients(cfg)
-    wm = state_manager.WindowManager()
+    print("启动套利监控系统...")
+    cfg = load_config()
 
-    polling_interval = cfg["monitoring"]["polling_interval_seconds"]
-    gas_fee = cfg["cost_assumptions"]["gas_fee_per_trade_usd"]
+    poly = PolymarketClient(
+        base_url="https://gamma-api.polymarket.com",
+        polling_interval=cfg.get("polling_interval", 2)
+    )
+    kalshi = KalshiClient(
+        base_url="https://api.elections.kalshi.com/trade-api/v2",
+        polling_interval=cfg.get("polling_interval", 2)
+    )
 
-    print("🚀 启动套利监控系统...")
-    print(f"轮询间隔: {polling_interval}s | 监控市场数: {len(cfg['market_pairs'])}")
+    event_pairs = cfg.get("event_pairs", [])
+    interval = cfg.get("polling_interval", 2)
+
+    print(f"轮询间隔: {interval}s | 监控事件数: {len(event_pairs)}")
 
     while True:
-        table_rows = []
+        for pair in event_pairs:
+            event_name = pair.get("name")
+            poly_event_id = pair.get("polymarket_event_id")
+            kalshi_event_ticker = pair.get("kalshi_event_ticker")
 
-        for pair in cfg["market_pairs"]:
-            name = pair["market_name"]
-            poly_id = pair["polymarket_token"]
-            kalshi_id = pair["kalshi_ticker"]
+            print(f"\n正在监控事件: {event_name}")
 
-            # 1️⃣ 拉取两平台价格
-            poly_data = clients["poly"].fetch_price(poly_id)
-            kalshi_data = clients["kalshi"].fetch_price(kalshi_id)
+            try:
+                poly_markets = poly.fetch_event_markets(poly_event_id)
+                kalshi_markets = kalshi.fetch_event_markets(kalshi_event_ticker)
 
-            # 2️⃣ 错误处理
-            if not poly_data or not kalshi_data:
-                table_rows.append([name, "🔴 ERROR", "-", "-", "-", "-", datetime.datetime.utcnow().strftime("%H:%M:%S")])
-                logger.log_error({
-                    "timestamp": datetime.datetime.utcnow().isoformat(),
-                    "pair": name,
-                    "error": "missing data"
-                })
-                continue
+                results = compare_markets(poly_markets, kalshi_markets)
+                display_arbitrage_opportunities(results)
 
-            # 3️⃣ 成本与净价差计算
-            total_cost = fees.total_cost(
-                kalshi_price=kalshi_data["ask"],
-                poly_bid=poly_data["bid"],
-                poly_ask=poly_data["ask"],
-                gas_fee=gas_fee
-            )
+            except Exception as e:
+                print(f"事件 {event_name} 报错: {e}")
 
-            spread_K_to_P, spread_P_to_K = spreads.calc_spreads(
-                kalshi_bid=kalshi_data["bid"],
-                kalshi_ask=kalshi_data["ask"],
-                poly_bid=poly_data["bid"],
-                poly_ask=poly_data["ask"],
-                total_cost=total_cost
-            )
-
-            # 4️⃣ 状态更新与窗口跟踪
-            now = datetime.datetime.utcnow()
-            if spread_K_to_P > 0:
-                wm.update(name, spread_K_to_P, "K→P", now)
-                status, direction, net_spread = "🟢 OPPORTUNITY", "K→P", f"+${spread_K_to_P:.3f}"
-            elif spread_P_to_K > 0:
-                wm.update(name, spread_P_to_K, "P→K", now)
-                status, direction, net_spread = "🟢 OPPORTUNITY", "P→K", f"+${spread_P_to_K:.3f}"
-            else:
-                wm.update(name, 0, "-", now)
-                status, direction, net_spread = "⚪ MONITORING", "-", "-"
-
-            # 5️⃣ 写入价格快照日志
-            logger.log_snapshot({
-                "timestamp": now.isoformat(),
-                "market_pair": name,
-                "kalshi_bid": kalshi_data["bid"],
-                "kalshi_ask": kalshi_data["ask"],
-                "poly_bid": poly_data["bid"],
-                "poly_ask": poly_data["ask"],
-                "total_cost": round(total_cost, 4),
-                "net_spread_K_to_P": round(spread_K_to_P, 4),
-                "net_spread_P_to_K": round(spread_P_to_K, 4)
-            })
-
-            # 6️⃣ 渲染表格行
-            table_rows.append([
-                name,
-                status,
-                f"{kalshi_data['bid']:.2f}/{kalshi_data['ask']:.2f}",
-                f"{poly_data['bid']:.2f}/{poly_data['ask']:.2f}",
-                direction,
-                net_spread,
-                now.strftime("%H:%M:%S")
-            ])
-
-        # 7️⃣ 刷新终端 UI
-        terminal_ui.render_table(table_rows)
-
-        # 8️⃣ 保存状态检查点（每 5分钟一次）
-        if int(time.time()) % 300 < polling_interval:
-            wm.save_checkpoint("data/window_state.json")
-
-        time.sleep(polling_interval)
+        print(f"等待 {interval} 秒后继续轮询...\n")
+        time.sleep(interval)
 
 
 if __name__ == "__main__":
