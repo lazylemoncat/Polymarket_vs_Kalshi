@@ -1,14 +1,14 @@
 import requests
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from .base_client import BaseAPIClient
 
 
 class KalshiClient(BaseAPIClient):
     """
-    Kalshi API 客户端
-    通过 /events/{event_ticker} 获取事件详情和其所有市场行情。
-    文档：https://trading-api.readme.io/reference/get_events-event-ticker
+    /events/{event_ticker} -> 返回该事件下所有子市场
+    输出标准结构：{ "title": str, "bid": float, "ask": float, "raw": dict }
+    价格单位：0~1 美元（yes_*_dollars）
     """
 
     def __init__(self, base_url: str, polling_interval: int, api_key: str = None):
@@ -16,11 +16,6 @@ class KalshiClient(BaseAPIClient):
         self.api_key = api_key
 
     def fetch_event_markets(self, event_ticker: str):
-        """
-        根据事件ticker获取所有市场的行情。
-        :param event_ticker: 如 "KXHIGHNY-25OCT15"
-        :return: list[dict]
-        """
         url = f"{self.base_url}/events/{event_ticker}"
         headers = {"Accept": "application/json"}
         if self.api_key:
@@ -32,77 +27,56 @@ class KalshiClient(BaseAPIClient):
                 self.handle_rate_limit()
                 return []
             resp.raise_for_status()
-
             data = resp.json()
-            if "markets" not in data:
-                logging.warning(f"[Kalshi] Event {event_ticker} has no markets field.")
-                return []
+            markets = data.get("markets") or []
 
-            results = []
-            for m in data["markets"]:
+            def to_float_dollars(s, default):
+                if s is None:
+                    return default
                 try:
-                    yes_bid = float(m.get("yes_bid_dollars", "0").strip('"'))
-                    yes_ask = float(m.get("yes_ask_dollars", "1").strip('"'))
-                    no_bid = float(m.get("no_bid_dollars", "0").strip('"'))
-                    no_ask = float(m.get("no_ask_dollars", "1").strip('"'))
+                    return float(str(s).strip('"'))
+                except Exception:
+                    return default
 
-                    # 简化取价：我们主要关注 yes 方向
-                    bid = yes_bid
-                    ask = yes_ask
+            out = []
+            for m in markets:
+                title = m.get("subtitle") or m.get("yes_sub_title") or m.get("ticker")
+                bid = to_float_dollars(m.get("yes_bid_dollars"), 0.0)
+                ask = to_float_dollars(m.get("yes_ask_dollars"), 1.0)
 
-                    if not (0 <= bid <= 1 and 0 <= ask <= 1):
-                        continue
+                if not (0 <= bid <= 1 and 0 <= ask <= 1 and bid <= ask):
+                    continue
 
-                    results.append({
-                        "ticker": m.get("ticker"),
-                        "subtitle": m.get("subtitle", ""),
-                        "bid": bid,
-                        "ask": ask,
-                        "volume": m.get("volume", 0),
-                        "status": m.get("status"),
-                        "strike_type": m.get("strike_type"),
-                        "floor_strike": m.get("floor_strike"),
-                        "cap_strike": m.get("cap_strike"),
-                        "open_interest": m.get("open_interest"),
-                        "updatedAt": datetime.utcnow().isoformat()
-                    })
-                except Exception as inner_e:
-                    logging.warning(f"[Kalshi] skip invalid market: {inner_e}")
+                out.append({
+                    "title": title,
+                    "bid": bid,
+                    "ask": ask,
+                    "raw": m,
+                })
 
-            logging.info(f"[Kalshi] Event {event_ticker} => {len(results)} markets parsed.")
-            return results
+            logging.info(f"[Kalshi] event {event_ticker} parsed {len(out)} markets.")
+            return out
 
         except Exception as e:
             logging.error({
                 "source": "Kalshi",
                 "error": str(e),
-                "time": datetime.utcnow().isoformat()
+                "time": datetime.now(timezone.utc).isoformat()
             })
             return []
 
 
-# ------------------------------------------------------------------------------
-# ✅ 独立测试区块
-# ------------------------------------------------------------------------------
+# 独立测试
 if __name__ == "__main__":
     from pprint import pprint
-
-    print("🔍 Testing Kalshi API connection...")
-
-    kalshi = KalshiClient(
+    print("🔍 Testing Kalshi /events/{event_ticker} ...")
+    client = KalshiClient(
         base_url="https://api.elections.kalshi.com/trade-api/v2",
         polling_interval=2,
         api_key=None
     )
-
     event_ticker = "KXHIGHNY-25OCT15"
-    print(f"Fetching event {event_ticker} from Kalshi...")
-    markets = kalshi.fetch_event_markets(event_ticker)
-
-    if not markets:
-        print("❌ No markets returned or API request failed.")
-    else:
-        print(f"✅ Retrieved {len(markets)} markets from event {event_ticker}")
-        print("-" * 80)
-        for m in markets:
-            pprint(m)
+    markets = client.fetch_event_markets(event_ticker)
+    print(f"✅ markets: {len(markets)}")
+    for m in markets:
+        pprint(m)
