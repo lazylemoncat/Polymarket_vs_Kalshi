@@ -23,6 +23,15 @@ Windows (PowerShell): `.venv\Scripts\Activate.ps1`
 5. 运行项目: `uv run python test.py`
 
 # 使用
-1. 将事件对写入`Kalshi vs Polymarket 候选对.xlsx`中,或直接写入`config.json`
+1. 将事件对写入`Kalshi vs Polymarket 候选对.xlsx`中.如:
+
+    | 类型 | Kalshi 标题                       | Polymarket 标题                            | 状态              | Kalshi 市场 | Polymarket 市场 | Kalshi URL                                                   | Polymarket URL                                               | 验证备注                        |
+    | ---- | --------------------------------- | ------------------------------------------ | ----------------- | ----------- | --------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------- |
+    | 天气 | Highest temperature in NYC today? | Highest temperature in NYC on  October 15? | ✅ Confirmed Match | 65° to 66°  | 65-66°F         | https://kalshi.com/markets/kxhighny/highest-temperature-in-nyc/kxhighny-25oct15 | https://polymarket.com/event/highest-temperature-in-nyc-on-october-15?tid=1760517554638 | 结算源不一致     截止时间不一致 |
+    |      |                                   |                                            |                   |             |                 |                                                              |                                                              |                                 |
+
+
+
 2. 运行`read_excel_config.py`将`Kalshi vs Polymarket 候选对.xlsx`中的配置写入`config.json`中.
-3. 运行 uv run python src/monitor.py --config config.json --log-dir . 启动监控；日志文件将生成在指定目录
+
+3. 运行 `uv run python src/monitor.py` 启动监控；日志文件将生成在指定目录
