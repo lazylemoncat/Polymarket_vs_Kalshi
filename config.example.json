@@ -1,38 +1,21 @@
 {
-  // === 配置文件示例 (v2) ===
-  // 用户应复制此文件为 config.json 并填入真实参数。
-  // 所有价格均使用美元(USD)，时间为 UTC。
-
   "event_pairs": [
     {
-      // --- 基本信息 ---
       "id": "event_001",
       "name": "Highest temperature in NYC on Oct 15, 2025",
 
-      // Polymarket 与 Kalshi 的事件标识
-      // Polymarket 使用 event_id 或合约ID，如 "58873"
-      // Kalshi 使用事件 ticker，如 "KXHIGHNY-25OCT15"
       "polymarket_event_id": "58873",
       "kalshi_event_ticker": "KXHIGHNY-25OCT15",
 
-      // 结算时间（ISO 格式，UTC）
       "settlement_date": "2025-10-22T14:00:00Z",
-
-      // 是否人工验证过配对正确
       "manually_verified": true,
-
-      // 说明备注
       "notes": "结算源不一致；截止时间不一致",
 
-      // --- 手动映射 ---
-      // 这里列出两平台在同一事件下的“子市场”标题对应关系。
-      // 左边是 Polymarket 的 groupItemTitle 或 question，
-      // 右边是 Kalshi 的 subtitle / yes_sub_title / no_sub_title。
       "markets_map": [
         { "polymarket_title": "61°F or below", "kalshi_title": "62° or below" },
-        { "polymarket_title": "62–63°F", "kalshi_title": "63° to 64°" },
-        { "polymarket_title": "64–65°F", "kalshi_title": "65° to 66°" },
-        { "polymarket_title": "66–67°F", "kalshi_title": "67° to 68°" },
+        { "polymarket_title": "62-63°F", "kalshi_title": "63° to 64°" },
+        { "polymarket_title": "64-65°F", "kalshi_title": "65° to 66°" },
+        { "polymarket_title": "66-67°F", "kalshi_title": "67° to 68°" },
         { "polymarket_title": "72°F or higher", "kalshi_title": "71° or above" }
       ]
     },
@@ -45,36 +28,20 @@
       "manually_verified": true,
       "notes": "深度尽调已完成",
 
-      // 在加密类事件中，Kalshi 可能没有 title/subtitle，
-      // 需使用 yes_sub_title/no_sub_title 映射。
       "markets_map": [
         { "polymarket_title": "≤ 1.68 USD", "kalshi_title": "1.6799999 or below" },
-        { "polymarket_title": "1.68 – 1.6999 USD", "kalshi_title": "1.68 to 1.6999" },
+        { "polymarket_title": "1.68 - 1.6999 USD", "kalshi_title": "1.68 to 1.6999" },
         { "polymarket_title": "≥ 3.08 USD", "kalshi_title": "3.08 to 3.0999" }
       ]
     }
   ],
 
-  // --- 监控参数 ---
   "monitoring": {
-    // 每次轮询 Polymarket / Kalshi API 的时间间隔（秒）
     "polling_interval_seconds": 2,
-
-    // 持续监控时长（小时）
     "monitoring_duration_hours": 48
   },
 
-  // --- 成本假设 ---
   "cost_assumptions": {
-    // 每笔交易估算的Gas费（美元）
     "gas_fee_per_trade_usd": 0.10
-  },
-
-  // --- 报警设置 ---
-  "alerting": {
-    // 如果想启用 Telegram 报警，将 enabled 设为 true 并填入以下两项
-    "enabled": false,
-    "telegram_bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
-    "telegram_chat_id": "YOUR_CHAT_ID"
   }
 }

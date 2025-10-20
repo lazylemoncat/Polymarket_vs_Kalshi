@@ -3,11 +3,10 @@ import logging
 from datetime import datetime, timezone
 from .base_client import BaseAPIClient
 
-
 class PolymarketClient(BaseAPIClient):
     """
     /events/{id} -> 返回该事件下所有子市场
-    输出标准结构：{ "title": str, "bid": float, "ask": float, "raw": dict }
+    标准结构：{ "title": str, "bid": float, "ask": float, "raw": dict }
     价格单位：0~1 美元
     """
 
@@ -27,13 +26,12 @@ class PolymarketClient(BaseAPIClient):
 
             out = []
             for m in markets:
-                # 标题直接用于匹配
                 title = m.get("groupItemTitle") or m.get("question") or m.get("slug") or str(m.get("id"))
 
-                # 价格优先 bestBid/bestAsk；若缺失，尝试 outcomePrices
                 bid = m.get("bestBid")
                 ask = m.get("bestAsk")
 
+                # 兜底：尝试 outcomePrices（如 '["0","1"]'）
                 if bid is None or ask is None:
                     op = (m.get("outcomePrices") or "").strip()
                     if op.startswith("["):
@@ -41,8 +39,7 @@ class PolymarketClient(BaseAPIClient):
                             parts = op.strip("[]").replace('"', '').split(",")
                             vals = [float(x) for x in parts if x.strip() != ""]
                             if len(vals) >= 2:
-                                bid = min(vals)
-                                ask = max(vals)
+                                bid, ask = min(vals), max(vals)
                         except Exception:
                             pass
 
@@ -77,13 +74,11 @@ class PolymarketClient(BaseAPIClient):
             return []
 
 
-# 独立测试
+# 单文件测试
 if __name__ == "__main__":
     from pprint import pprint
-    print("🔍 Testing Polymarket /events/{id} ...")
     client = PolymarketClient(base_url="https://gamma-api.polymarket.com", polling_interval=2)
-    event_id = "58873"
-    markets = client.fetch_event_markets(event_id)
+    markets = client.fetch_event_markets("58873")
     print(f"✅ markets: {len(markets)}")
     for m in markets:
         pprint(m)

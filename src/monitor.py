@@ -1,135 +1,122 @@
-import time
-import os
-import json
+import asyncio
 import datetime
+import json
+import logging
+import math
+import time
+from pathlib import Path
 
-from utils.polymarket_client import PolymarketClient
+from rich import box
+from rich.console import Console
+from rich.live import Live
+from rich.table import Table
+
+from logger_setup import setup_logging
+from utils import config_loader
 from utils.kalshi_client import KalshiClient
-from utils import fees, config_loader
+from utils.polymarket_client import PolymarketClient
+from utils.telegramNotifier import TelegramNotifier
+
+setup_logging()
+logger = logging.getLogger("monitor")
 
 
-# ===== 写出接口：当前写文件，后续可改 Telegram =====
-def handle_arbitrage_signal(signal: dict):
-    os.makedirs("data", exist_ok=True)
+# ---------- 全局常量 ----------
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+ERROR_LOG = DATA_DIR / "errors.log"
+ARBITRAGE_LOG = DATA_DIR / "arbitrage.log"
+WINDOW_STATE_JSON = DATA_DIR / "window_state.json"
+PRICE_SNAPSHOTS_CSV = DATA_DIR / "price_snapshots.csv"
+OPP_WINDOWS_CSV = DATA_DIR / "opportunity_windows.csv"
+
+console = Console()
+
+
+# ---------- 工具函数 ----------
+def _utc_now_iso():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def _log_error(source: str, message: str):
+    row = {"time": _utc_now_iso(), "source": source, "error": message}
+    with ERROR_LOG.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def calc_kalshi_fee(prob: float) -> float:
+    """Kalshi taker 费率模型（PRD公式）"""
+    try:
+        fee = math.ceil(0.07 * prob * (1 - prob) * 100) / 100 * 2
+        return round(fee, 4)
+    except Exception:
+        return 0.0
+
+
+def normalize(s: str):
+    if not s:
+        return ""
+    t = s.strip().lower()
+    t = t.replace("–", "-").replace("—", "-")
+    t = t.replace("°f", "°").replace(" °", "°")
+    t = " ".join(t.split())
+    return t
+
+
+def find_market_by_title(markets: list, target_title: str):
+    nt = normalize(target_title)
+    for m in markets:
+        if normalize(m.get("title", "")) == nt:
+            return m
+    return None
+
+
+# ---------- 机会窗口管理类（前文已完整实现） ----------
+from monitor_windows import (
+    OpportunityWindowManager,  # 这里假设已拆出为独立模块，逻辑同前版
+)
+
+
+# ---------- 错误计数器 ----------
+class FailureTracker:
+    def __init__(self):
+        self.counts = {}
+
+    def mark_failure(self, key):
+        self.counts[key] = self.counts.get(key, 0) + 1
+        if self.counts[key] >= 3:
+            _log_error(key, f"连续3次数据获取失败")
+            self.counts[key] = 0
+
+    def mark_success(self, key):
+        self.counts[key] = 0
+
+
+# ---------- 核心监控逻辑 ----------
+async def handle_arbitrage_signal(signal: dict, notifier: TelegramNotifier):
     payload = dict(signal)
-    payload["timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    with open(os.path.join("data", "arbitrage.log"), "a", encoding="utf-8") as f:
+    payload["timestamp"] = _utc_now_iso()
+    with ARBITRAGE_LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    print("💾 已记录套利机会 -> data/arbitrage.log")
+
+    msg = (
+        f"⚡ *套利机会！*\n"
+        f"事件: {payload['event']}\n"
+        f"市场: {payload['polymarket_title']} ↔ {payload['kalshi_title']}\n"
+        f"Poly: {payload['poly_bid']}/{payload['poly_ask']}\n"
+        f"Kalshi: {payload['kalshi_bid']}/{payload['kalshi_ask']}\n"
+        f"K→P: {payload['net_spread_sell_K_buy_P']}, P→K: {payload['net_spread_sell_P_buy_K']}"
+    )
+    try:
+        await notifier.send_message(msg, parse_mode="Markdown")
+    except Exception as e:
+        _log_error("telegram", str(e))
 
 
-# ===== 兼容老/新配置结构 =====
-def normalize_event_pairs(cfg: dict):
-    pairs = []
-
-    # 新版：event_pairs
-    if isinstance(cfg.get("event_pairs"), list):
-        for x in cfg["event_pairs"]:
-            pairs.append({
-                "name": x.get("name") or x.get("market_name") or "Untitled Event",
-                "polymarket_event_id": x.get("polymarket_event_id") or x.get("polymarket_token"),
-                "kalshi_event_ticker": x.get("kalshi_event_ticker") or x.get("kalshi_ticker"),
-            })
-
-    # 旧版：market_pairs（把 token/ticker 视为事件ID / 事件ticker）
-    elif isinstance(cfg.get("market_pairs"), list):
-        for x in cfg["market_pairs"]:
-            pairs.append({
-                "name": x.get("market_name") or x.get("id") or "Untitled Event",
-                "polymarket_event_id": x.get("polymarket_token"),
-                "kalshi_event_ticker": x.get("kalshi_ticker"),
-            })
-
-    # 过滤缺失
-    return [p for p in pairs if p["polymarket_event_id"] and p["kalshi_event_ticker"]]
-
-
-# ===== 按“标题完全一致”匹配 =====
-def match_markets_by_title(poly_markets, kalshi_markets):
-    """
-    poly_markets / kalshi_markets: [{title, bid, ask, ...}]
-    返回配对列表 [(poly, kalshi), ...]，只匹配标题完全一致的条目
-    """
-    kd = {m["title"]: m for m in kalshi_markets if m.get("title")}
-    matched, skipped = [], []
-    for pm in poly_markets:
-        t = pm.get("title")
-        if not t:
-            continue
-        km = kd.get(t)
-        if km:
-            matched.append((pm, km))
-        else:
-            skipped.append(t)
-    if skipped:
-        print(f"⚠️ 未在 Kalshi 找到同名市场（被跳过）：{', '.join(skipped[:5])}" + (" ..." if len(skipped) > 5 else ""))
-    return matched
-
-
-# ===== 组装事件级比较 + 净价差 =====
-def build_event_comparison(event_name, matched_pairs, gas_fee_usd: float):
-    results = {"event": event_name, "markets": []}
-    for poly_m, kalshi_m in matched_pairs:
-        pb, pa = poly_m["bid"], poly_m["ask"]
-        kb, ka = kalshi_m["bid"], kalshi_m["ask"]
-
-        # 方向1：卖 Kalshi(吃 bid) + 买 Polymarket(吃 ask)
-        total_cost_K_to_P = fees.total_cost(
-            kalshi_price=kb, poly_bid=pb, poly_ask=pa, gas_fee=gas_fee_usd
-        )
-        net_K_to_P = kb - pa - total_cost_K_to_P
-
-        # 方向2：卖 Polymarket(吃 bid) + 买 Kalshi(吃 ask)
-        total_cost_P_to_K = fees.total_cost(
-            kalshi_price=ka, poly_bid=pb, poly_ask=pa, gas_fee=gas_fee_usd
-        )
-        net_P_to_K = pb - ka - total_cost_P_to_K
-
-        results["markets"].append({
-            "title": poly_m["title"],  # 两边同名
-            "poly_bid": round(pb, 4), "poly_ask": round(pa, 4),
-            "kalshi_bid": round(kb, 4), "kalshi_ask": round(ka, 4),
-            "net_spread_sell_K_buy_P": round(net_K_to_P, 4),
-            "net_spread_sell_P_buy_K": round(net_P_to_K, 4),
-        })
-    return results
-
-
-# ===== 输出套利机会（多市场/双方向） =====
-def display_arbitrage_opportunities(event_comparisons, log_if_positive=True):
-    any_arb = False
-    for ev in event_comparisons:
-        print(f"\n📊 事件: {ev['event']}")
-        for m in ev["markets"]:
-            k2p = m["net_spread_sell_K_buy_P"]
-            p2k = m["net_spread_sell_P_buy_K"]
-            if k2p > 0 or p2k > 0:
-                any_arb = True
-                print(f"⚖️ 市场: {m['title']}")
-                print(f"    Polymarket: {m['poly_bid']:.3f}/{m['poly_ask']:.3f} | Kalshi: {m['kalshi_bid']:.3f}/{m['kalshi_ask']:.3f}")
-                if k2p > 0:
-                    print(f"    ▶ 方向 K→P (卖K 买P) 净价差: +{k2p:.3f}")
-                if p2k > 0:
-                    print(f"    ▶ 方向 P→K (卖P 买K) 净价差: +{p2k:.3f}")
-                print("-" * 72)
-                if log_if_positive:
-                    handle_arbitrage_signal({
-                        "event": ev["event"],
-                        "title": m["title"],
-                        "poly_bid": m["poly_bid"], "poly_ask": m["poly_ask"],
-                        "kalshi_bid": m["kalshi_bid"], "kalshi_ask": m["kalshi_ask"],
-                        "net_spread_sell_K_buy_P": k2p,
-                        "net_spread_sell_P_buy_K": p2k,
-                    })
-    if not any_arb:
-        print("暂无套利机会。")
-
-
-def main():
-    print("🚀 启动套利监控系统...")
-    cfg = config_loader.load_config()
-
-    polling_interval = cfg.get("monitoring", {}).get("polling_interval_seconds") or cfg.get("polling_interval", 2)
+async def monitor_once(cfg, notifier, window_mgr, fail_tracker):
+    polling_interval = cfg["monitoring"]["polling_interval_seconds"]
+    gas_fee = cfg["cost_assumptions"]["gas_fee_per_trade_usd"]
 
     poly = PolymarketClient(
         base_url="https://gamma-api.polymarket.com",
@@ -141,41 +128,140 @@ def main():
         api_key=cfg.get("kalshi_api_key")
     )
 
-    pairs = normalize_event_pairs(cfg)
-    gas_fee = cfg.get("cost_assumptions", {}).get("gas_fee_per_trade_usd", 0.10)
-    print(f"轮询间隔: {polling_interval}s | 监控事件数: {len(pairs)}")
+    pairs = cfg["event_pairs"]
+    table = Table(title="Arbitrage Monitor Snapshot", box=box.MINIMAL_DOUBLE_HEAD)
+    table.add_column("Event", justify="left")
+    table.add_column("Market Pair", justify="left")
+    table.add_column("K→P", justify="right")
+    table.add_column("P→K", justify="right")
+    table.add_column("Status", justify="center")
 
-    while True:
-        round_results = []
-        for pair in pairs:
-            event_name = pair["name"]
-            pid = pair["polymarket_event_id"]
-            kt = pair["kalshi_event_ticker"]
+    any_event = False
 
-            print(f"\n🔎 拉取事件：{event_name}")
-            poly_markets = poly.fetch_event_markets(pid)      # [{title,bid,ask}]
-            kalshi_markets = kalshi.fetch_event_markets(kt)   # [{title,bid,ask}]
+    for ev in pairs:
+        name = ev["name"]
+        eid = ev.get("id", name)
+        pid = ev["polymarket_event_id"]
+        kt = ev["kalshi_event_ticker"]
+        mapping = ev["markets_map"]
 
-            if not poly_markets or not kalshi_markets:
-                print("⚠️ 任一平台未返回市场数据，跳过该事件。")
+        poly_markets = poly.fetch_event_markets(pid)
+        kalshi_markets = kalshi.fetch_event_markets(kt)
+
+        if not poly_markets or not kalshi_markets:
+            fail_tracker.mark_failure(name)
+            table.add_row(name, "-", "-", "-", "[red]❌ Failed")
+            continue
+        fail_tracker.mark_success(name)
+
+        any_event = True
+        for mp in mapping:
+            p_title = mp["polymarket_title"]
+            k_title = mp["kalshi_title"]
+            market_pair_label = f"{p_title} ↔ {k_title}"
+            pair_key = f"{eid}::{p_title}::{k_title}"
+            pm = find_market_by_title(poly_markets, p_title)
+            km = find_market_by_title(kalshi_markets, k_title)
+
+            if not pm or not km:
+                table.add_row(name, market_pair_label, "-", "-", "[yellow]Skipped")
                 continue
 
-            matched = match_markets_by_title(poly_markets, kalshi_markets)
-            if not matched:
-                print("⚠️ 没有标题相同的市场，跳过该事件。")
-                continue
+            pb, pa = pm["bid"], pm["ask"]
+            kb, ka = km["bid"], km["ask"]
 
-            ev_comp = build_event_comparison(event_name, matched, gas_fee_usd=gas_fee)
-            round_results.append(ev_comp)
+            # Kalshi 费用纳入 total_cost
+            kalshi_fee = calc_kalshi_fee(kb)
+            total_cost = gas_fee + kalshi_fee
 
-        if round_results:
-            display_arbitrage_opportunities(round_results, log_if_positive=True)
-        else:
-            print("⚠️ 本轮无可比对事件或无匹配市场。")
+            net_K_to_P = pb - ka - total_cost
+            net_P_to_K = kb - pa - total_cost
+            now_iso = _utc_now_iso()
 
-        print(f"\n⏳ 等待 {polling_interval} 秒后继续轮询...")
-        time.sleep(polling_interval)
+            window_mgr.write_snapshot(market_pair_label, kb, ka, pb, pa, total_cost,
+                                      net_K_to_P, net_P_to_K, now_iso)
+
+            opened = False
+            if net_K_to_P > 0:
+                window_mgr.open_or_update(pair_key, "K_to_P", market_pair_label, net_K_to_P, now_iso)
+                opened = True
+            else:
+                window_mgr.close_if_open(pair_key, "K_to_P", now_iso)
+
+            if net_P_to_K > 0:
+                window_mgr.open_or_update(pair_key, "P_to_K", market_pair_label, net_P_to_K, now_iso)
+                opened = True
+            else:
+                window_mgr.close_if_open(pair_key, "P_to_K", now_iso)
+
+            status = "[green]Open" if opened else "[dim]Idle"
+            table.add_row(name, market_pair_label,
+                          f"{net_K_to_P:.3f}", f"{net_P_to_K:.3f}", status)
+
+            if opened:
+                await handle_arbitrage_signal({
+                    "event": name,
+                    "polymarket_title": p_title,
+                    "kalshi_title": k_title,
+                    "poly_bid": round(pb, 4), "poly_ask": round(pa, 4),
+                    "kalshi_bid": round(kb, 4), "kalshi_ask": round(ka, 4),
+                    "net_spread_sell_K_buy_P": round(net_K_to_P, 4),
+                    "net_spread_sell_P_buy_K": round(net_P_to_K, 4),
+                }, notifier)
+
+    console.clear()
+    console.print(table)
+    window_mgr.maybe_checkpoint()
+
+
+async def main():
+    logger.info("🚀 启动套利监控系统...")
+    cfg = config_loader.load_config()
+
+    # --- 配置校验 ---
+    assert cfg["monitoring"]["polling_interval_seconds"] > 0, "polling_interval_seconds 必须 > 0"
+    assert cfg["monitoring"]["duration_hours"] > 0, "duration_hours 必须 > 0"
+    assert cfg["cost_assumptions"]["gas_fee_per_trade_usd"] >= 0, "gas_fee_per_trade_usd 必须 ≥ 0"
+
+    notifier = TelegramNotifier(
+        token=cfg["alerting"]["telegram_bot_token"],
+        chat_id=cfg["alerting"]["telegram_chat_id"]
+    )
+
+    window_mgr = OpportunityWindowManager()
+    window_mgr.load_or_recover()
+    fail_tracker = FailureTracker()
+
+    polling_interval = cfg["monitoring"]["polling_interval_seconds"]
+    duration_hours = cfg["monitoring"]["duration_hours"]
+    start_time = time.time()
+    base_interval = polling_interval
+    extended = False
+
+    console.print(f"轮询间隔: {polling_interval}s | 持续时长: {duration_hours}h")
+
+    with Live(console=console, refresh_per_second=4):
+        while True:
+            await monitor_once(cfg, notifier, window_mgr, fail_tracker)
+            elapsed_h = (time.time() - start_time) / 3600
+            if elapsed_h >= duration_hours:
+                console.print(f"[bold yellow]⏹ 达到配置的监控时长 ({duration_hours}h)，自动退出。")
+                break
+
+            # 动态调整轮询间隔（冷却恢复）
+            if getattr(KalshiClient, "retry_count", 0) > 5 and not extended:
+                polling_interval = int(polling_interval * 1.5)
+                console.print(f"[yellow]⚠️ 检测到频繁429，临时延长轮询间隔至 {polling_interval}s")
+                extended = True
+            elif extended and getattr(KalshiClient, "retry_count", 0) == 0:
+                polling_interval = base_interval
+                extended = False
+                console.print("[green]✅ 已恢复正常轮询频率")
+
+            await asyncio.sleep(polling_interval)
+
+    console.print("[bold green]✅ 监控任务已结束。")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

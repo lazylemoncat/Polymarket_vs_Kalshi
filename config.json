@@ -1,59 +1,114 @@
 {
-  "market_pairs": [
+  "event_pairs": [
     {
       "id": "pair_001",
-      "polymarket_token": "58873",
-      "kalshi_ticker": "KXHIGHNY-25OCT15",
-      "market_name": "Highest temperature in NYC on October 15?",
+      "name": "Highest temperature in NYC on October 15?",
+      "polymarket_event_id": "58873",
+      "kalshi_event_ticker": "KXHIGHNY-25OCT15",
       "settlement_date": "2025-10-15T12:00:00Z",
-      "notes": "结算源不一致；截止时间不一致"
-    },
-    {
-      "id": "pair_002",
-      "polymarket_token": "57018",
-      "kalshi_ticker": "KXXRP-25OCT1600",
-      "market_name": "XRP price on October 16?",
-      "settlement_date": "2025-10-16T16:00:00Z",
-      "notes": "结算源不一致；截止时间不一致"
-    },
-    {
-      "id": "pair_003",
-      "polymarket_token": "56528",
-      "kalshi_ticker": "KXETHD-25OCT1517",
-      "market_name": "Ethereum price on October 15?",
-      "settlement_date": "2025-10-15T16:00:00Z",
+      "manually_verified": true,
+      "markets_map": [
+        { "polymarket_title": "61°F or below", "kalshi_title": "62° or below" },
+        { "polymarket_title": "62-63°F", "kalshi_title": "63° to 64°" },
+        { "polymarket_title": "64-65°F", "kalshi_title": "65° to 66°" },
+        { "polymarket_title": "66-67°F", "kalshi_title": "67° to 68°" },
+        { "polymarket_title": "68-69°F", "kalshi_title": "69° to 70°" },
+        { "polymarket_title": "72°F or higher", "kalshi_title": "71° or above" }
+      ],
       "notes": "结算源不一致；截止时间不一致"
     },
     {
       "id": "pair_004",
-      "polymarket_token": "57570",
-      "kalshi_ticker": "KXPOWELLMENTION-25OCT15",
-      "market_name": "What will Powell say during his speech on October 14?",
+      "name": "What will Powell say during his speech on October 14?",
+      "polymarket_event_id": "57570",
+      "kalshi_event_ticker": "KXPOWELLMENTION-25OCT15",
       "settlement_date": "2025-10-14T00:00:00Z",
+      "manually_verified": true,
+      "markets_map": [
+        {
+          "polymarket_title": "Will Powell say \"AI\" or \"Artificial Intelligence\" during speech on October 14?",
+          "kalshi_title": "AI / Artificial Intelligence"
+        },
+        {
+          "polymarket_title": "Will Powell say \"Beige Book\" during speech on October 14?",
+          "kalshi_title": "Beige Book"
+        },
+        {
+          "polymarket_title": "Will Powell say \"Shutdown\" or \"Shut Down\" during speech on October 14?",
+          "kalshi_title": "Shutdown / Shut Down"
+        },
+        {
+          "polymarket_title": "Will Powell say \"Inflation\" 35+ times during speech on October 14?",
+          "kalshi_title": "Tariff Inflation"
+        },
+        {
+          "polymarket_title": "Will Powell say \"Pardon Me\" or \"Sorry\" during speech on October 14?",
+          "kalshi_title": "Pardon"
+        },
+        {
+          "polymarket_title": "Will Powell say \"Trump\" during speech on October 14?",
+          "kalshi_title": "Trump"
+        }
+      ],
       "notes": "深度尽调已完成"
     },
     {
       "id": "pair_005",
-      "polymarket_token": "59200",
-      "kalshi_ticker": "KXBERNIEMENTION-25OCT16",
-      "market_name": "What will Bernie Sanders say during CNN town hall on October 15?",
+      "name": "What will Bernie Sanders say during CNN town hall on October 15?",
+      "polymarket_event_id": "59200",
+      "kalshi_event_ticker": "KXBERNIEMENTION-25OCT16",
       "settlement_date": "2025-10-15T00:00:00Z",
+      "manually_verified": true,
+      "markets_map": [
+        {
+          "polymarket_title": "Socialism / Socialist",
+          "kalshi_title": "Socialism / Socialist"
+        },
+        {
+          "polymarket_title": "62-63°F",
+          "kalshi_title": "63° to 64°"
+        },
+        {
+          "polymarket_title": "64-65°F",
+          "kalshi_title": "65° to 66°"
+        },
+        {
+          "polymarket_title": "66-67°F",
+          "kalshi_title": "67° to 68°"
+        },
+        {
+          "polymarket_title": "68-69°F",
+          "kalshi_title": "69° to 70°"
+        },
+        {
+          "polymarket_title": "72°F or higher",
+          "kalshi_title": "71° or above"
+        }
+      ],
       "notes": "深度尽调已完成"
     },
     {
       "id": "pair_006",
-      "polymarket_token": "56512",
-      "kalshi_ticker": "KXBTCD-25OCT1517",
-      "market_name": "Bitcoin price on October 15?",
+      "name": "Bitcoin price on October 15?",
+      "polymarket_event_id": "56512",
+      "kalshi_event_ticker": "KXBTCD-25OCT1517",
       "settlement_date": "2025-10-15T16:00:00Z",
+      "manually_verified": true,
+      "markets_map": [
+
+      ],
       "notes": "结算源不一致；截止时间不一致"
     },
     {
       "id": "pair_007",
-      "polymarket_token": "57472",
-      "kalshi_ticker": "KXBTCD-25OCT1717",
-      "market_name": "Bitcoin price on October 17?",
+      "name": "Bitcoin price on October 17?",
+      "polymarket_event_id": "57472",
+      "kalshi_event_ticker": "KXBTCD-25OCT1717",
       "settlement_date": "2025-10-17T16:00:00Z",
+      "manually_verified": true,
+      "markets_map": [
+
+      ],
       "notes": "结算源不一致；截止时间不一致"
     }
   ],
@@ -63,9 +118,5 @@
   },
   "cost_assumptions": {
     "gas_fee_per_trade_usd": 0.10
-  },
-  "alerting": {
-    "telegram_bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
-    "telegram_chat_id": "YOUR_CHAT_ID"
   }
 }
