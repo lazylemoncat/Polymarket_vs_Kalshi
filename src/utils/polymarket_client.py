@@ -1,7 +1,13 @@
-import requests
+import json
 import logging
 from datetime import datetime, timezone
+
+import requests
+
 from .base_client import BaseAPIClient
+
+
+logger = logging.getLogger(__name__)
 
 class PolymarketClient(BaseAPIClient):
     """
@@ -62,23 +68,30 @@ class PolymarketClient(BaseAPIClient):
                     "raw": m,
                 })
 
-            logging.info(f"[Polymarket] event {event_id} parsed {len(out)} markets.")
+            logger.info("[Polymarket] event %s parsed %d markets.", event_id, len(out))
             return out
 
-        except Exception as e:
-            logging.error({
-                "source": "Polymarket",
-                "error": str(e),
-                "time": datetime.now(timezone.utc).isoformat()
-            })
+        except Exception as e:  # noqa: BLE001
+            logger.error(
+                json.dumps(
+                    {
+                        "source": "Polymarket",
+                        "error": str(e),
+                        "time": datetime.now(timezone.utc).isoformat(),
+                    },
+                    ensure_ascii=False,
+                )
+            )
             return []
 
 
 # 单文件测试
 if __name__ == "__main__":
-    from pprint import pprint
-    client = PolymarketClient(base_url="https://gamma-api.polymarket.com", polling_interval=2)
+    logging.basicConfig(level=logging.INFO)
+    client = PolymarketClient(
+        base_url="https://gamma-api.polymarket.com", polling_interval=2
+    )
     markets = client.fetch_event_markets("58873")
-    print(f"✅ markets: {len(markets)}")
-    for m in markets:
-        pprint(m)
+    logger.info("markets: %d", len(markets))
+    for market in markets:
+        logger.debug(json.dumps(market, ensure_ascii=False))

@@ -8,12 +8,17 @@ monitor_windows.py
 ----------------------------------------
 """
 
-import csv
-import json
 import datetime
 import time
+import csv
+import json
+import logging
 from pathlib import Path
 from typing import Dict
+
+
+# ---------- 日志 ----------
+logger = logging.getLogger(__name__)
 
 
 # ---------- 文件路径 ----------
@@ -33,8 +38,8 @@ SNAPSHOT_HEADERS = [
     "poly_bid",
     "poly_ask",
     "total_cost",
-    "net_spread_K_to_P",
-    "net_spread_P_to_K",
+    "net_spread_buy_K_sell_P",
+    "net_spread_buy_P_sell_K",
 ]
 
 WINDOW_HEADERS = [
@@ -158,7 +163,7 @@ class OpportunityWindowManager:
 
     def write_snapshot(self, market_pair_label: str, kb: float, ka: float,
                        pb: float, pa: float, total_cost: float,
-                       net_K_to_P: float, net_P_to_K: float, now_iso: str):
+                       buy_k_sell_p: float, buy_p_sell_k: float, now_iso: str):
         row = {
             "timestamp": now_iso,
             "market_pair": market_pair_label,
@@ -167,8 +172,8 @@ class OpportunityWindowManager:
             "poly_bid": round(pb, 6),
             "poly_ask": round(pa, 6),
             "total_cost": round(total_cost, 6),
-            "net_spread_K_to_P": round(net_K_to_P, 6),
-            "net_spread_P_to_K": round(net_P_to_K, 6),
+            "net_spread_buy_K_sell_P": round(buy_k_sell_p, 6),
+            "net_spread_buy_P_sell_K": round(buy_p_sell_k, 6),
         }
         _append_csv_row(PRICE_SNAPSHOTS_CSV, SNAPSHOT_HEADERS, row)
 
@@ -205,11 +210,20 @@ class OpportunityWindowManager:
             if delta_sec <= 300:
                 self.active_windows = {}
                 for w in active_windows:
-                    if all(k in w for k in ("window_id", "market_pair", "direction",
-                                            "start_time", "last_time", "pair_key")):
+                    if all(
+                        k in w
+                        for k in (
+                            "window_id",
+                            "market_pair",
+                            "direction",
+                            "start_time",
+                            "last_time",
+                            "pair_key",
+                        )
+                    ):
                         wk = self._window_key(w["pair_key"], w["direction"])
                         self.active_windows[wk] = w
-                print(f"🟢 恢复 {len(self.active_windows)} 个进行中窗口。")
+                logger.info("恢复 %d 个进行中窗口。", len(self.active_windows))
             else:
                 now_iso = _utc_now_iso()
                 forced = 0
@@ -236,9 +250,9 @@ class OpportunityWindowManager:
                         _append_csv_row(OPP_WINDOWS_CSV, WINDOW_HEADERS, row)
                         forced += 1
                     except Exception:
-                        continue
+                        logger.exception("Failed to force-close expired window state")
                 if forced:
-                    print(f"🟡 检测到过期状态，强制结束 {forced} 个窗口。")
+                    logger.warning("检测到过期状态，强制结束 %d 个窗口。", forced)
                 WINDOW_STATE_JSON.unlink(missing_ok=True)
         except Exception:
-            pass
+            logger.exception("Failed to load or recover window state")

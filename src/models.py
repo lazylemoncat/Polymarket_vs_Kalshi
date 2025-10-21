@@ -1,7 +1,11 @@
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 import json
 import os
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -158,10 +162,14 @@ def load_config(path: str = "config.json") -> AppConfig:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     try:
         cfg = load_config("config.json")
-        print("Config loaded successfully.")
-        print(f"Loaded {len(cfg.event_pairs)} event pair(s).")
-        print(f"Polling interval: {cfg.monitoring.polling_interval_seconds}s")
-    except Exception as exc:
-        print(f"Failed to load config: {exc}")
+        logger.info("Config loaded successfully.")
+        logger.info("Loaded %d event pair(s).", len(cfg.event_pairs))
+        logger.info(
+            "Polling interval: %ss",
+            cfg.monitoring.polling_interval_seconds,
+        )
+    except Exception:
+        logger.exception("Failed to load config")

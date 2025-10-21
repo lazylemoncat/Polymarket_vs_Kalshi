@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -7,6 +8,9 @@ import pandas as pd
 
 from models import MarketPair
 from polymarket_api import get_market_public_search
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -105,9 +109,17 @@ def main():
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
-    print(f"已更新 {config_path} 中的 market_pairs ({len(marketPairs)} 条)")
-    
+    logger.info(
+        "已更新 %s 中的 market_pairs (%d 条)",
+        config_path,
+        len(marketPairs),
+    )
+
 
 
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(level=logging.INFO)
+    try:
+        main()
+    except Exception:
+        logger.exception("Failed to update market_pairs from Excel")

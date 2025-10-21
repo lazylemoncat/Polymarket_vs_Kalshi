@@ -25,8 +25,6 @@ logger = logging.getLogger("monitor")
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-ERROR_LOG = DATA_DIR / "errors.log"
-ARBITRAGE_LOG = DATA_DIR / "arbitrage.log"
 WINDOW_STATE_JSON = DATA_DIR / "window_state.json"
 PRICE_SNAPSHOTS_CSV = DATA_DIR / "price_snapshots.csv"
 OPP_WINDOWS_CSV = DATA_DIR / "opportunity_windows.csv"
@@ -37,12 +35,6 @@ console = Console()
 # ---------- 工具函数 ----------
 def _utc_now_iso():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
-
-
-def _log_error(source: str, message: str):
-    row = {"time": _utc_now_iso(), "source": source, "error": message}
-    with ERROR_LOG.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def calc_kalshi_fee(prob: float) -> float:
@@ -86,7 +78,16 @@ class FailureTracker:
     def mark_failure(self, key):
         self.counts[key] = self.counts.get(key, 0) + 1
         if self.counts[key] >= 3:
-            _log_error(key, f"连续3次数据获取失败")
+            logger.error(
+                json.dumps(
+                    {
+                        "source": key,
+                        "error": "连续3次数据获取失败",
+                        "time": _utc_now_iso(),
+                    },
+                    ensure_ascii=False,
+                )
+            )
             self.counts[key] = 0
 
     def mark_success(self, key):
@@ -97,8 +98,11 @@ class FailureTracker:
 async def handle_arbitrage_signal(signal: dict, notifier: TelegramNotifier):
     payload = dict(signal)
     payload["timestamp"] = _utc_now_iso()
-    with ARBITRAGE_LOG.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    logger.info(
+        json.dumps(
+            {"type": "arbitrage_signal", **payload}, ensure_ascii=False
+        )
+    )
 
     msg = (
         f"⚡ *套利机会！*\n"
@@ -106,12 +110,21 @@ async def handle_arbitrage_signal(signal: dict, notifier: TelegramNotifier):
         f"市场: {payload['polymarket_title']} ↔ {payload['kalshi_title']}\n"
         f"Poly: {payload['poly_bid']}/{payload['poly_ask']}\n"
         f"Kalshi: {payload['kalshi_bid']}/{payload['kalshi_ask']}\n"
-        f"K→P: {payload['net_spread_sell_K_buy_P']}, P→K: {payload['net_spread_sell_P_buy_K']}"
+        f"K→P: {payload['net_spread_buy_K_sell_P']}, P→K: {payload['net_spread_buy_P_sell_K']}"
     )
     try:
         await notifier.send_message(msg, parse_mode="Markdown")
-    except Exception as e:
-        _log_error("telegram", str(e))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            json.dumps(
+                {
+                    "source": "telegram",
+                    "error": str(exc),
+                    "time": _utc_now_iso(),
+                },
+                ensure_ascii=False,
+            )
+        )
 
 
 async def monitor_once(cfg, notifier, window_mgr, fail_tracker):
@@ -136,8 +149,6 @@ async def monitor_once(cfg, notifier, window_mgr, fail_tracker):
     table.add_column("P→K", justify="right")
     table.add_column("Status", justify="center")
 
-    any_event = False
-
     for ev in pairs:
         name = ev["name"]
         eid = ev.get("id", name)
@@ -154,7 +165,6 @@ async def monitor_once(cfg, notifier, window_mgr, fail_tracker):
             continue
         fail_tracker.mark_success(name)
 
-        any_event = True
         for mp in mapping:
             p_title = mp["polymarket_title"]
             k_title = mp["kalshi_title"]
@@ -174,29 +184,29 @@ async def monitor_once(cfg, notifier, window_mgr, fail_tracker):
             kalshi_fee = calc_kalshi_fee(kb)
             total_cost = gas_fee + kalshi_fee
 
-            net_K_to_P = pb - ka - total_cost
-            net_P_to_K = kb - pa - total_cost
+            buy_k_sell_p = pb - ka - total_cost
+            buy_p_sell_k = kb - pa - total_cost
             now_iso = _utc_now_iso()
 
             window_mgr.write_snapshot(market_pair_label, kb, ka, pb, pa, total_cost,
-                                      net_K_to_P, net_P_to_K, now_iso)
+                                      buy_k_sell_p, buy_p_sell_k, now_iso)
 
             opened = False
-            if net_K_to_P > 0:
-                window_mgr.open_or_update(pair_key, "K_to_P", market_pair_label, net_K_to_P, now_iso)
+            if buy_k_sell_p > 0:
+                window_mgr.open_or_update(pair_key, "K_to_P", market_pair_label, buy_k_sell_p, now_iso)
                 opened = True
             else:
                 window_mgr.close_if_open(pair_key, "K_to_P", now_iso)
 
-            if net_P_to_K > 0:
-                window_mgr.open_or_update(pair_key, "P_to_K", market_pair_label, net_P_to_K, now_iso)
+            if buy_p_sell_k > 0:
+                window_mgr.open_or_update(pair_key, "P_to_K", market_pair_label, buy_p_sell_k, now_iso)
                 opened = True
             else:
                 window_mgr.close_if_open(pair_key, "P_to_K", now_iso)
 
             status = "[green]Open" if opened else "[dim]Idle"
             table.add_row(name, market_pair_label,
-                          f"{net_K_to_P:.3f}", f"{net_P_to_K:.3f}", status)
+                          f"{buy_k_sell_p:.3f}", f"{buy_p_sell_k:.3f}", status)
 
             if opened:
                 await handle_arbitrage_signal({
@@ -205,13 +215,12 @@ async def monitor_once(cfg, notifier, window_mgr, fail_tracker):
                     "kalshi_title": k_title,
                     "poly_bid": round(pb, 4), "poly_ask": round(pa, 4),
                     "kalshi_bid": round(kb, 4), "kalshi_ask": round(ka, 4),
-                    "net_spread_sell_K_buy_P": round(net_K_to_P, 4),
-                    "net_spread_sell_P_buy_K": round(net_P_to_K, 4),
+                    "net_spread_buy_K_sell_P": round(buy_k_sell_p, 4),
+                    "net_spread_buy_P_sell_K": round(buy_p_sell_k, 4),
                 }, notifier)
 
-    console.clear()
-    console.print(table)
     window_mgr.maybe_checkpoint()
+    return table
 
 
 async def main():
@@ -238,29 +247,36 @@ async def main():
     base_interval = polling_interval
     extended = False
 
-    console.print(f"轮询间隔: {polling_interval}s | 持续时长: {duration_hours}h")
+    logger.info(
+        "轮询间隔: %ss | 持续时长: %sh", polling_interval, duration_hours
+    )
 
-    with Live(console=console, refresh_per_second=4):
+    with Live(console=console, refresh_per_second=4) as live:
         while True:
-            await monitor_once(cfg, notifier, window_mgr, fail_tracker)
+            table = await monitor_once(cfg, notifier, window_mgr, fail_tracker)
+            live.update(table)
             elapsed_h = (time.time() - start_time) / 3600
             if elapsed_h >= duration_hours:
-                console.print(f"[bold yellow]⏹ 达到配置的监控时长 ({duration_hours}h)，自动退出。")
+                logger.info(
+                    "⏹ 达到配置的监控时长 (%sh)，自动退出。", duration_hours
+                )
                 break
 
             # 动态调整轮询间隔（冷却恢复）
             if getattr(KalshiClient, "retry_count", 0) > 5 and not extended:
                 polling_interval = int(polling_interval * 1.5)
-                console.print(f"[yellow]⚠️ 检测到频繁429，临时延长轮询间隔至 {polling_interval}s")
+                logger.warning(
+                    "⚠️ 检测到频繁429，临时延长轮询间隔至 %ss", polling_interval
+                )
                 extended = True
             elif extended and getattr(KalshiClient, "retry_count", 0) == 0:
                 polling_interval = base_interval
                 extended = False
-                console.print("[green]✅ 已恢复正常轮询频率")
+                logger.info("✅ 已恢复正常轮询频率")
 
             await asyncio.sleep(polling_interval)
 
-    console.print("[bold green]✅ 监控任务已结束。")
+    logger.info("✅ 监控任务已结束。")
 
 
 if __name__ == "__main__":
