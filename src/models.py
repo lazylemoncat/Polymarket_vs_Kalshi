@@ -18,6 +18,8 @@ class MarketPair:
     market_name: str
     settlement_date: str
     manually_verified: bool
+    polymarket_market_id: str
+    kalshi_market_id: str
     notes: Optional[str] = None
 
 

@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from models import MarketPair
-from polymarket_api import get_market_public_search
+from .models import MarketPair
+from .polymarket_api import get_market_public_search
+from .kalshi_api import get_event_by_event_ticker
 
 
 logger = logging.getLogger(__name__)
@@ -19,8 +20,10 @@ class Pair:
     type: str
     kalshi_title: str
     polymarket_title: str
+    polymarket_market: str
     status: str
     kalshi_url: str
+    kalshi_market: str
     polymarket_url: str
     notes: str
 
@@ -29,7 +32,9 @@ class MarketPairMapping:
     """定义 Excel 列名与 dataclass 字段的对应关系"""
     type_col: str = "类型"
     kalshi_title_col: str = "Kalshi 标题"
+    kalshi_market_col: str = "Kalshi 市场"
     polymarket_title_col: str = "Polymarket 标题"
+    poymarket_market_col: str = "Polymarket 市场"
     status_col: str = "状态"
     kalshi_url_col: str = "Kalshi URL"
     polymarket_url_col: str = "Polymarket URL"
@@ -53,7 +58,7 @@ def load_market_pairs(excel_path: str, mapping: MarketPairMapping):
 
     def get_attr(row, col_name: str, default=""):
         # 根据 mapping 中原始列名找到对应的 tuple 属性名
-        attr_name = attr_map.get(col_name)
+        attr_name = attr_map.get(col_name, "")
         return getattr(row, attr_name, default)
 
     pairs = []
@@ -62,7 +67,9 @@ def load_market_pairs(excel_path: str, mapping: MarketPairMapping):
             id=f"pair_{i:03d}",
             type=get_attr(row, mapping.type_col),
             kalshi_title=get_attr(row, mapping.kalshi_title_col),
+            kalshi_market=get_attr(row, mapping.kalshi_market_col),
             polymarket_title=get_attr(row, mapping.polymarket_title_col),
+            polymarket_market=get_attr(row, mapping.poymarket_market_col),
             status=get_attr(row, mapping.status_col),
             kalshi_url=get_attr(row, mapping.kalshi_url_col),
             polymarket_url=get_attr(row, mapping.polymarket_url_col),
@@ -83,9 +90,26 @@ def main():
     marketPairs = []
     for p in pairs:
         events = get_market_public_search(p.polymarket_title).get('events')[0]
+        markets = events.get('markets', [])
+        polymarket_market_id = ""
+        for market in markets:
+            if market.get('groupItemTitle') == p.polymarket_market:
+                polymarket_market_id = market.get('id')
+                break
+
         polymarket_token = events.get('id')
         settlement_date = events.get('endDate')
+
         kalshi_ticker = p.kalshi_url.rstrip("/").split("/")[-1].upper()
+        kalshi_markets = get_event_by_event_ticker(kalshi_ticker).get('markets', [])
+        kalshi_market_id = ""
+        for kalshi_market in kalshi_markets:
+            title = kalshi_market.get('sub_title') or kalshi_market.get('yes_sub_title') \
+                    or kalshi_market.get('no_sub_title')
+            if title == p.kalshi_market:
+                kalshi_market_id = kalshi_market.get('ticker')
+                break
+
         marketPairs.append(MarketPair(
             id=p.id,
             polymarket_token=polymarket_token,
@@ -93,6 +117,8 @@ def main():
             market_name=p.polymarket_title,
             settlement_date=settlement_date,
             manually_verified=True,
+            polymarket_market_id=polymarket_market_id,
+            kalshi_market_id=kalshi_market_id,
             notes=p.notes
         ))
     
