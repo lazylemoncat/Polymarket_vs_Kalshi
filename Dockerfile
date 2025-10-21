@@ -24,4 +24,4 @@ RUN mkdir -p /app/data /app/logs
 EXPOSE 8080
 
 # 启动命令
-CMD ["python", "monitor.py"]
+CMD ["python", "src.monitor"]

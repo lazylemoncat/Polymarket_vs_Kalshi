@@ -1,113 +1,107 @@
-import requests
+"""Client for fetching market data from Kalshi's public API."""
+
+from __future__ import annotations
+
 import logging
 import time
 from datetime import datetime, timezone
+from typing import Any, Dict, List
+
+import requests
+
 from .base_client import BaseAPIClient
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 class KalshiClient(BaseAPIClient):
-    """
-    Kalshi 市场数据客户端
-    ----------------------
-    - 接口: /events/{event_ticker}
-    - 返回结构: { "title": str, "bid": float, "ask": float, "raw": dict }
-    - 单位: 美元 (yes_*_dollars)
-    - 支持自动限速退避与 retry 计数
-    """
+    """Thin wrapper around the Kalshi event API with rate-limit awareness."""
+
+    RATE_LIMIT_STATUS = 429
+    COOLDOWN_SECONDS = 300
 
     def __init__(self, base_url: str, polling_interval: int, api_key: str | None = None):
         super().__init__(name="Kalshi", base_url=base_url, polling_interval=polling_interval)
         self.api_key = api_key
-        self.retry_count = 0            # ✅ 初始化重试计数
-        self.last_retry_ts = 0.0        # 最近一次错误时间戳
-        self.cooldown_seconds = 300     # 连续错误后冷却期（秒）
+        self.retry_count = 0
+        self.last_retry_ts = 0.0
 
-    def fetch_event_markets(self, event_ticker: str):
+    def fetch_event_markets(self, event_ticker: str) -> List[Dict[str, Any]]:
         url = f"{self.base_url}/events/{event_ticker}"
         headers = {"Accept": "application/json"}
         if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"  # 使用 API Key 认证
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
         try:
-            resp = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10)
 
-            # ---------- 429 限速逻辑 ----------
-            if resp.status_code == 429:
-                self.retry_count += 1
-                self.last_retry_ts = time.time()
+            if response.status_code == self.RATE_LIMIT_STATUS:
+                self._register_retry()
                 self.handle_rate_limit()
-                logging.warning(f"[Kalshi] HTTP 429 (rate limited). retry_count={self.retry_count}")
+                LOGGER.warning("[Kalshi] HTTP 429 (rate limited). retry_count=%s", self.retry_count)
                 return []
 
-            resp.raise_for_status()
-            data = resp.json()
-            markets = data.get("markets") or []
+            response.raise_for_status()
+            markets = (response.json() or {}).get("markets") or []
+            parsed = [market for market in map(self._parse_market, markets) if market]
 
-            # ---------- 解析 ----------
-            def to_float_dollars(s, default):
-                if s is None:
-                    return default
-                try:
-                    return float(str(s).strip('"'))
-                except Exception:
-                    return default
-
-            def normalize_title(m):
-                """容错提取标题"""
-                for key in ("title", "subtitle", "yes_sub_title", "no_sub_title", "ticker"):
-                    val = m.get(key)
-                    if val and isinstance(val, str) and val.strip():
-                        t = val.strip().replace("$", "").strip()
-                        return t
-                return "Unknown"
-
-            out = []
-            for m in markets:
-                title = normalize_title(m)
-                bid = to_float_dollars(m.get("yes_bid_dollars"), 0.0)
-                ask = to_float_dollars(m.get("yes_ask_dollars"), 1.0)
-
-                if not (0 <= bid <= 1 and 0 <= ask <= 1 and bid <= ask):
-                    continue
-
-                out.append({
-                    "title": title,
-                    "bid": bid,
-                    "ask": ask,
-                    "raw": m,
-                })
-
-            # ---------- 成功：清空 retry_count ----------
-            if self.retry_count > 0:
-                logging.info(f"[Kalshi] ✅ 请求恢复正常，重试计数清零 (was {self.retry_count})")
+            if self.retry_count:
+                LOGGER.info("[Kalshi] ✅ 请求恢复正常，重试计数清零 (was %s)", self.retry_count)
             self.retry_count = 0
-            return out
+            return parsed
 
-        except Exception as e:
-            self.retry_count += 1
-            self.last_retry_ts = time.time()
-            logging.error({
-                "source": "Kalshi",
-                "error": str(e),
-                "retry_count": self.retry_count,
-                "time": datetime.now(timezone.utc).isoformat()
-            })
+        except Exception as exc:  # noqa: BLE001
+            self._register_retry()
+            LOGGER.error(
+                {
+                    "source": "Kalshi",
+                    "error": str(exc),
+                    "retry_count": self.retry_count,
+                    "time": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             return []
 
-    # ---------- 额外辅助方法 ----------
     def should_extend_interval(self) -> bool:
-        """
-        主循环可调用，用于判断是否进入冷却期
-        """
-        # 若最近 5 分钟内有 5 次以上失败，则建议延长间隔
-        if self.retry_count >= 5 and (time.time() - self.last_retry_ts < self.cooldown_seconds):
-            return True
-        return False
+        """Return True when the caller should apply a longer polling interval."""
 
-    def should_restore_interval(self) -> bool:
-        """
-        若冷却后恢复成功，重置状态
-        """
-        if self.retry_count == 0:
-            return True
-        return False
+        within_cooldown = time.time() - self.last_retry_ts < self.COOLDOWN_SECONDS
+        return self.retry_count >= 5 and within_cooldown
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+    def _register_retry(self) -> None:
+        self.retry_count += 1
+        self.last_retry_ts = time.time()
+
+    @staticmethod
+    def _parse_market(market: Dict[str, Any]) -> Dict[str, Any] | None:
+        def to_float(value, default):
+            if value is None:
+                return default
+            try:
+                return float(str(value).strip('"'))
+            except Exception:  # noqa: BLE001
+                return default
+
+        def pick_title(entry: Dict[str, Any]) -> str:
+            for key in ("title", "subtitle", "yes_sub_title", "no_sub_title", "ticker"):
+                candidate = entry.get(key)
+                if isinstance(candidate, str) and candidate.strip():
+                    return candidate.strip().replace("$", "").strip()
+            return "Unknown"
+
+        bid = to_float(market.get("yes_bid_dollars"), 0.0)
+        ask = to_float(market.get("yes_ask_dollars"), 1.0)
+
+        if not (0 <= bid <= 1 and 0 <= ask <= 1 and bid <= ask):
+            return None
+
+        return {
+            "title": pick_title(market),
+            "bid": bid,
+            "ask": ask,
+            "raw": market,
+        }

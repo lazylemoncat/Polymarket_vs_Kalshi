@@ -1,26 +1,26 @@
 {
     "market_pairs": [
         {
-        "id": "pair_001",
-        "polymarket_token": "52525",
-        "kalshi_ticker": "KXBTCMAXM-25OCT31",
-        "market_name": "What price will Bitcoin hit in October?",
-        "settlement_date": "2025-11-01T04:00:00Z",
-        "manually_verified": true,
-        "polymarket_market_id": "618952",
-        "kalshi_market_id": "KXBTCMAXM-25OCT31-129999.99",
-        "notes": "结算源不一致\n截止时间不一致"
+            "id": "pair_001",
+            "polymarket_token": "52525",
+            "kalshi_ticker": "KXBTCMAXM-25OCT31",
+            "market_name": "What price will Bitcoin hit in October?",
+            "settlement_date": "2025-11-01T04:00:00Z",
+            "manually_verified": true,
+            "polymarket_market_id": "618952",
+            "kalshi_market_id": "KXBTCMAXM-25OCT31-129999.99",
+            "notes": "结算源不一致\n截止时间不一致"
         },
         {
-        "id": "pair_002",
-        "polymarket_token": "52525",
-        "kalshi_ticker": "KXBTCMAXM-25OCT31",
-        "market_name": "What price will Bitcoin hit in October?",
-        "settlement_date": "2025-11-01T04:00:00Z",
-        "manually_verified": true,
-        "polymarket_market_id": "618951",
-        "kalshi_market_id": "KXBTCMAXM-25OCT31-134999.99",
-        "notes": "结算源不一致\n截止时间不一致"
+            "id": "pair_002",
+            "polymarket_token": "52525",
+            "kalshi_ticker": "KXBTCMAXM-25OCT31",
+            "market_name": "What price will Bitcoin hit in October?",
+            "settlement_date": "2025-11-01T04:00:00Z",
+            "manually_verified": true,
+            "polymarket_market_id": "618951",
+            "kalshi_market_id": "KXBTCMAXM-25OCT31-134999.99",
+            "notes": "结算源不一致\n截止时间不一致"
         }
     ],
     "monitoring": {
