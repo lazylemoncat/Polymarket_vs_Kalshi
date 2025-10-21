@@ -70,14 +70,14 @@
 - **操作**：在 Kalshi 买入 @Ask，在 Polymarket 卖出 @Bid
 - **净价差**：
   ```
-  net_spread_sell_P_buy_K = Poly_Bid - Kalshi_Ask - Cost_Total
+  net_spread_buy_K_sell_P = Poly_Bid - Kalshi_Ask - Cost_Total
   ```
 
 **方向2（做空 Kalshi，做多 Polymarket）：**
 - **操作**：在 Kalshi 卖出 @Bid，在 Polymarket 买入 @Ask
 - **净价差：**
   ```
-  net_spread_sell_K_buy_P = Kalshi_Bid - Poly_Ask - Cost_Total
+  net_spread_buy_P_sell_K = Kalshi_Bid - Poly_Ask - Cost_Total
   ```
 
 #### FR3.3 总成本 (`Cost_Total`)
@@ -110,8 +110,8 @@ Cost_Total = total_kalshi_fee + (Poly_Ask - Poly_Bid) + (gas_fee_per_trade_usd �
   - `poly_bid`
   - `poly_ask`
   - `total_cost`
-  - `net_spread_K_to_P`
-  - `net_spread_P_to_K`
+  - `net_spread_buy_K_sell_P`
+  - `net_spread_buy_P_sell_K`
 
 **2. `opportunity_windows.csv`（机会窗口日志）**
 - 仅在"窗口结束"时记录一行，用于核心统计分析

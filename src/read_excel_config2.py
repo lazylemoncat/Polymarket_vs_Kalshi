@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import re
 from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
@@ -12,6 +13,9 @@ from models import EventPair, MarketMapping
 from polymarket_api import get_market_public_search
 from utils.kalshi_client import KalshiClient
 from utils.polymarket_client import PolymarketClient
+
+
+logger = logging.getLogger(__name__)
 
 
 POLY_BASE_URL = "https://gamma-api.polymarket.com"
@@ -246,9 +250,23 @@ def main() -> None:
         try:
             pair = build_event_pair(row, len(event_pairs) + 1, poly_client, kalshi_client)
             event_pairs.append(pair)
-            print(f"[OK] Added pair for `{row.polymarket_title}` -> ticker `{pair.kalshi_event_ticker}`")
+            logger.info(
+                "Added pair for `%s` -> ticker `%s`",
+                row.polymarket_title,
+                pair.kalshi_event_ticker,
+            )
         except Exception as exc:
-            print(f"[WARN] Skipping `{row.polymarket_title}` (row {row.index}): {exc}")
+            logger.exception(
+                json.dumps(
+                    {
+                        "message": "Skipping row due to error",
+                        "polymarket_title": row.polymarket_title,
+                        "row_index": row.index,
+                        "error": str(exc),
+                    },
+                    ensure_ascii=False,
+                )
+            )
 
     if not event_pairs:
         raise RuntimeError("No event pairs were generated; aborting.")
@@ -267,8 +285,12 @@ def main() -> None:
     with output_path.open("w", encoding="utf-8") as handle:
         json.dump(merged, handle, ensure_ascii=False, indent=2)
 
-    print(f"\nWrote {len(event_pairs)} event pair(s) to {output_path}")
+    logger.info("Wrote %d event pair(s) to %s", len(event_pairs), output_path)
 
 
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(level=logging.INFO)
+    try:
+        main()
+    except Exception:
+        logger.exception("Failed to build config from Excel")
