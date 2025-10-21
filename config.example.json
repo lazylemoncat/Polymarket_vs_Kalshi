@@ -1,38 +1,26 @@
 {
-  "event_pairs": [
+  "market_pairs": [
     {
-      "id": "event_001",
-      "name": "Highest temperature in NYC on Oct 15, 2025",
-
-      "polymarket_event_id": "58873",
-      "kalshi_event_ticker": "KXHIGHNY-25OCT15",
-
+      "id": "pair_001",
+      "market_name": "NYC High Temp on Oct 15 2025",
+      "polymarket_token": "58873",
+      "polymarket_market_id": "103921",
+      "kalshi_ticker": "KXHIGHNY-25OCT15",
+      "kalshi_market_id": "KXHIGHNY-25OCT15-65.0",
       "settlement_date": "2025-10-22T14:00:00Z",
       "manually_verified": true,
-      "notes": "结算源不一致；截止时间不一致",
-
-      "markets_map": [
-        { "polymarket_title": "61°F or below", "kalshi_title": "62° or below" },
-        { "polymarket_title": "62-63°F", "kalshi_title": "63° to 64°" },
-        { "polymarket_title": "64-65°F", "kalshi_title": "65° to 66°" },
-        { "polymarket_title": "66-67°F", "kalshi_title": "67° to 68°" },
-        { "polymarket_title": "72°F or higher", "kalshi_title": "71° or above" }
-      ]
+      "notes": "温度口径已核对"
     },
     {
-      "id": "event_002",
-      "name": "Ripple (XRP) price at Oct 16, 2025 12am EDT",
-      "polymarket_event_id": "0xabc123def456...",
-      "kalshi_event_ticker": "KXXRP-25OCT1600",
-      "settlement_date": "2025-10-16T04:00:00Z",
+      "id": "pair_002",
+      "market_name": "BTC price upper bound Oct 2025",
+      "polymarket_token": "52525",
+      "polymarket_market_id": "618952",
+      "kalshi_ticker": "KXBTCMAXM-25OCT31",
+      "kalshi_market_id": "KXBTCMAXM-25OCT31-129999.99",
+      "settlement_date": "2025-11-01T04:00:00Z",
       "manually_verified": true,
-      "notes": "深度尽调已完成",
-
-      "markets_map": [
-        { "polymarket_title": "≤ 1.68 USD", "kalshi_title": "1.6799999 or below" },
-        { "polymarket_title": "1.68 - 1.6999 USD", "kalshi_title": "1.68 to 1.6999" },
-        { "polymarket_title": "≥ 3.08 USD", "kalshi_title": "3.08 to 3.0999" }
-      ]
+      "notes": "截止时间与 Kalshi 对齐"
     }
   ],
 
