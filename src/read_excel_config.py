@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from .models import MarketPair
-from .polymarket_api import get_market_public_search
-from .kalshi_api import get_event_by_event_ticker
+from models import MarketPair
+from polymarket_api import get_market_public_search
+from kalshi_api import get_event_by_event_ticker
 
 
 logger = logging.getLogger(__name__)

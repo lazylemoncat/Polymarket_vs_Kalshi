@@ -1,160 +1,33 @@
 {
-  "event_pairs": [
-    {
-      "id": "pair_001",
-      "name": "Highest temperature in NYC on October 15?",
-      "polymarket_event_id": "58873",
-      "kalshi_event_ticker": "KXHIGHNY-25OCT15",
-      "settlement_date": "2025-10-15T12:00:00Z",
-      "manually_verified": true,
-      "markets_map": [
+    "market_pairs": [
         {
-          "polymarket_title": "61°F or below",
-          "kalshi_title": "62° or below"
+        "id": "pair_001",
+        "polymarket_token": "52525",
+        "kalshi_ticker": "KXBTCMAXM-25OCT31",
+        "market_name": "What price will Bitcoin hit in October?",
+        "settlement_date": "2025-11-01T04:00:00Z",
+        "manually_verified": true,
+        "polymarket_market_id": "618952",
+        "kalshi_market_id": "KXBTCMAXM-25OCT31-129999.99",
+        "notes": "结算源不一致\n截止时间不一致"
         },
         {
-          "polymarket_title": "62-63°F",
-          "kalshi_title": "63° to 64°"
-        },
-        {
-          "polymarket_title": "64-65°F",
-          "kalshi_title": "65° to 66°"
-        },
-        {
-          "polymarket_title": "66-67°F",
-          "kalshi_title": "67° to 68°"
-        },
-        {
-          "polymarket_title": "68-69°F",
-          "kalshi_title": "69° to 70°"
-        },
-        {
-          "polymarket_title": "72°F or higher",
-          "kalshi_title": "71° or above"
+        "id": "pair_002",
+        "polymarket_token": "52525",
+        "kalshi_ticker": "KXBTCMAXM-25OCT31",
+        "market_name": "What price will Bitcoin hit in October?",
+        "settlement_date": "2025-11-01T04:00:00Z",
+        "manually_verified": true,
+        "polymarket_market_id": "618951",
+        "kalshi_market_id": "KXBTCMAXM-25OCT31-134999.99",
+        "notes": "结算源不一致\n截止时间不一致"
         }
-      ],
-      "notes": "结算源不一致；截止时间不一致"
+    ],
+    "monitoring": {
+        "polling_interval_seconds": 2,
+        "monitoring_duration_hours": 48
     },
-    {
-      "id": "pair_004",
-      "name": "What will Powell say during his speech on October 14?",
-      "polymarket_event_id": "57570",
-      "kalshi_event_ticker": "KXPOWELLMENTION-25OCT15",
-      "settlement_date": "2025-10-14T00:00:00Z",
-      "manually_verified": true,
-      "markets_map": [
-        {
-          "polymarket_title": "Will Powell say \"AI\" or \"Artificial Intelligence\" during speech on October 14?",
-          "kalshi_title": "AI / Artificial Intelligence"
-        },
-        {
-          "polymarket_title": "Will Powell say \"Beige Book\" during speech on October 14?",
-          "kalshi_title": "Beige Book"
-        },
-        {
-          "polymarket_title": "Will Powell say \"Shutdown\" or \"Shut Down\" during speech on October 14?",
-          "kalshi_title": "Shutdown / Shut Down"
-        },
-        {
-          "polymarket_title": "Will Powell say \"Inflation\" 35+ times during speech on October 14?",
-          "kalshi_title": "Tariff Inflation"
-        },
-        {
-          "polymarket_title": "Will Powell say \"Pardon Me\" or \"Sorry\" during speech on October 14?",
-          "kalshi_title": "Pardon"
-        },
-        {
-          "polymarket_title": "Will Powell say \"Trump\" during speech on October 14?",
-          "kalshi_title": "Trump"
-        }
-      ],
-      "notes": "深度尽调已完成"
-    },
-    {
-      "id": "pair_005",
-      "name": "What will Bernie Sanders say during CNN town hall on October 15?",
-      "polymarket_event_id": "59200",
-      "kalshi_event_ticker": "KXBERNIEMENTION-25OCT16",
-      "settlement_date": "2025-10-15T00:00:00Z",
-      "manually_verified": true,
-      "markets_map": [
-        {
-          "polymarket_title": "Socialism / Socialist",
-          "kalshi_title": "Socialism / Socialist"
-        },
-        {
-          "polymarket_title": "62-63°F",
-          "kalshi_title": "63° to 64°"
-        },
-        {
-          "polymarket_title": "64-65°F",
-          "kalshi_title": "65° to 66°"
-        },
-        {
-          "polymarket_title": "66-67°F",
-          "kalshi_title": "67° to 68°"
-        },
-        {
-          "polymarket_title": "68-69°F",
-          "kalshi_title": "69° to 70°"
-        },
-        {
-          "polymarket_title": "72°F or higher",
-          "kalshi_title": "71° or above"
-        }
-      ],
-      "notes": "深度尽调已完成"
-    },
-    {
-      "id": "pair_006",
-      "name": "Bitcoin price on October 15?",
-      "polymarket_event_id": "56512",
-      "kalshi_event_ticker": "KXBTCD-25OCT1517",
-      "settlement_date": "2025-10-15T16:00:00Z",
-      "manually_verified": true,
-      "markets_map": [],
-      "notes": "结算源不一致；截止时间不一致"
-    },
-    {
-      "id": "pair_007",
-      "name": "Bitcoin price on October 17?",
-      "polymarket_event_id": "57472",
-      "kalshi_event_ticker": "KXBTCD-25OCT1717",
-      "settlement_date": "2025-10-17T16:00:00Z",
-      "manually_verified": true,
-      "markets_map": [],
-      "notes": "结算源不一致；截止时间不一致"
+    "cost_assumptions": {
+        "gas_fee_per_trade_usd": 0.1
     }
-  ],
-  "monitoring": {
-    "polling_interval_seconds": 2,
-    "monitoring_duration_hours": 48
-  },
-  "cost_assumptions": {
-    "gas_fee_per_trade_usd": 0.1
-  },
-  "market_pairs": [
-    {
-      "id": "pair_001",
-      "polymarket_token": "52525",
-      "kalshi_ticker": "KXBTCMAXM-25OCT31",
-      "market_name": "What price will Bitcoin hit in October?",
-      "settlement_date": "2025-11-01T04:00:00Z",
-      "manually_verified": true,
-      "polymarket_market_id": "618952",
-      "kalshi_market_id": "KXBTCMAXM-25OCT31-129999.99",
-      "notes": "结算源不一致\n截止时间不一致"
-    },
-    {
-      "id": "pair_002",
-      "polymarket_token": "52525",
-      "kalshi_ticker": "KXBTCMAXM-25OCT31",
-      "market_name": "What price will Bitcoin hit in October?",
-      "settlement_date": "2025-11-01T04:00:00Z",
-      "manually_verified": true,
-      "polymarket_market_id": "618951",
-      "kalshi_market_id": "KXBTCMAXM-25OCT31-134999.99",
-      "notes": "结算源不一致\n截止时间不一致"
-    }
-  ]
 }

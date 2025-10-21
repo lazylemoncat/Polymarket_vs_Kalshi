@@ -4,13 +4,8 @@
 
 FROM python:3.11-slim
 
-LABEL maintainer="ArbitrageBot <dev@arbmonitor.io>"
-LABEL description="Polymarket-Kalshi arbitrage monitoring system"
-
 # 环境变量
-ENV PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    TZ=UTC
+ENV TZ=UTC
 
 # 创建工作目录
 WORKDIR /app
