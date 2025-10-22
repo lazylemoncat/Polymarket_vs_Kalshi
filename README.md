@@ -35,3 +35,9 @@ Windows (PowerShell): `.venv\Scripts\Activate.ps1`
 2. 运行`read_excel_config.py`将`Kalshi vs Polymarket 候选对.xlsx`中的配置写入`config.json`中.
 
 3. 运行 `uv run python src/monitor.py` 启动监控；日志文件将生成在指定目录
+
+# docker
+
+1. `docker build -t p_vs_k:latest .`
+
+2. `docker run -d -it --name p_vs_k --

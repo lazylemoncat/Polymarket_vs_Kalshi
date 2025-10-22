@@ -1,8 +1,4 @@
-# -------------------------------
-# Polymarket vs Kalshi Arbitrage Monitor
-# -------------------------------
-
-FROM python:3.11-slim
+FROM python:3.12.12-slim-bookworm
 
 # 环境变量
 ENV TZ=UTC
@@ -10,12 +6,16 @@ ENV TZ=UTC
 # 创建工作目录
 WORKDIR /app
 
-# 复制项目文件
-COPY . /app
+COPY pyproject.toml uv.lock ./
+
 
 # 安装依赖
-RUN pip install --no-cache-dir -U pip setuptools wheel \
-    && pip install --no-cache-dir aiohttp requests rich python-dotenv
+RUN pip install --no-cache-dir uv
+
+RUN uv sync --frozen --no-dev
+
+# 复制项目文件
+COPY . /app
 
 # 创建数据和日志目录
 RUN mkdir -p /app/data /app/logs
@@ -24,4 +24,4 @@ RUN mkdir -p /app/data /app/logs
 EXPOSE 8080
 
 # 启动命令
-CMD ["python", "src.monitor"]
+CMD ["uv", "run", "src/monitor.py"]

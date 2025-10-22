@@ -1,0 +1,15 @@
+# 忽略环境文件
+.env
+.env.*
+
+# 忽略虚拟环境
+venv/
+.venv/
+
+# 忽略编译产物
+__pycache__/
+*.pyc
+
+# 忽略git仓库文件
+.git
+.gitignore
