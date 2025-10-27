@@ -2,3 +2,5 @@
 .env
 todo.md
 __pycache__/
+data/
+logs/
