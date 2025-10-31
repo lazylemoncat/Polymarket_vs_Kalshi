@@ -53,16 +53,22 @@
 #### FR3.1 Kalshi 手续费精确计算
 
 - **taker 费率模型**：假设所有即时套利操作均为吃单（taker）
-- **单边费用公式**：
+- **费用公式**：
   ```
-  fee_per_trade = ceil(0.07 × P × (1-P) × 100) / 100
+  taker_fees = round up(0.07 x C x P x (1-P))
   ```
   其中 `P` 为执行价格，结果向上取整到美分
+
+- **maker 费率模型**：
+- **费用公式**：
+  ```
+  maker_fees = round up(0.0175 x C x P x (1-P))
+  ```
+  其中 `P` 为执行价格，结果向上取整到美分  
 - **总费用**：套利操作涉及开仓和平仓，因此总费用为
   ```
-  total_kalshi_fee = fee_per_trade × 2
+  total_kalshi_fee = taker_fees + maker_fees
   ```
-- **示例**：P=0.50，单边费为 `ceil(1.75)/100 = $0.02`，双边总费用为 `$0.04`
 
 #### FR3.2 净价差方向明确化
 
